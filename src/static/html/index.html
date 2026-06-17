@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TrikiVR</title>
+        <link rel="stylesheet" href="../css/index.css" />
+    </head>
+    <body>
+        <header>
+            <h1>TrikiVR</h1>
+            <p class="subtitle">Żabka Triki → SlimeVR bridge</p>
+        </header>
+
+        <div id="adapter-banner" class="banner hidden">
+            <span class="banner-icon">⚠️</span>
+            <span id="adapter-message"></span>
+        </div>
+
+        <section class="controls">
+            <button id="scan-toggle" class="primary">Start scanning</button>
+            <span id="status" class="status">Idle</span>
+        </section>
+
+        <section>
+            <h2>Devices</h2>
+            <ul id="device-list" class="device-list">
+                <li class="empty">No Triki devices found yet. Press the button on a Triki and start scanning.</li>
+            </ul>
+        </section>
+
+        <section class="log-section">
+            <h2>Log</h2>
+            <pre id="log" class="log"></pre>
+        </section>
+
+        <script type="module" src="../js/renderer.js"></script>
+    </body>
+</html>

@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "target": "ES2022",
+        "module": "ES2022",
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "strict": true,
+        "strictNullChecks": false,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "sourceMap": true
+    },
+    "include": ["src/**/*.ts", "src/preload.mts"],
+    "exclude": ["node_modules", "dist", "reference", "src/**/*.test.ts"]
+}

@@ -1,0 +1,19 @@
+export const NUS_SERVICE_UUID = "6e400001b5a3f393e0a9e50e24dcca9e";
+export const NUS_RX_CHARACTERISTIC_UUID = "6e400002b5a3f393e0a9e50e24dcca9e";
+export const NUS_TX_CHARACTERISTIC_UUID = "6e400003b5a3f393e0a9e50e24dcca9e";
+
+export const BATTERY_SERVICE_UUID = "0000180f00001000800000805f9b34fb";
+export const BATTERY_LEVEL_CHARACTERISTIC_UUID = "00002a1900001000800000805f9b34fb";
+
+export const TRIKI_NAME_MATCH = "Triki";
+
+export const FRAME_LENGTH = 14;
+export const FRAME_HEADER_0 = 0x22;
+export const FRAME_HEADER_1 = 0x00;
+
+export const GYRO_SCALE = 14.2857;
+export const ACCEL_SCALE = 2048.0;
+
+export const START_COMMAND = Buffer.from("201000D007680003", "hex");
+
+export const STARTUP_DISCARD_SAMPLES = 20;
