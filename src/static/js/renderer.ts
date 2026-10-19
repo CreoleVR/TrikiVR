@@ -124,7 +124,7 @@ function quatToMatrix3d(q: Quat): string {
     const m31 = 2 * (x * z - w * y);
     const m32 = 2 * (y * z + w * x);
     const m33 = 1 - 2 * (x * x + y * y);
-    return `matrix3d(${m11},${m21},${m31},0,${m12},${m22},${m32},0,${m13},${m23},${m33},0,0,0,0,1)`;
+    return `matrix3d(${m11},${-m21},${m31},0,${-m12},${m22},${-m32},0,${m13},${-m23},${m33},0,0,0,0,1)`;
 }
 
 function batteryIcon(percent: number): string {

@@ -5,6 +5,6 @@
         "rootDir": "./src",
         "sourceMap": false
     },
-    "include": ["src/core/**/*.ts"],
+    "include": ["src/core/**/*.ts", "src/static/js/visual*.ts"],
     "exclude": ["node_modules", "dist", "dist-test", "reference"]
 }

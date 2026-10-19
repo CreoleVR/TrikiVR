@@ -59,6 +59,15 @@ function fromAxisAngle(ax: number, ay: number, az: number, angleRad: number): Q 
     return { w: Math.cos(h), x: ax * s, y: ay * s, z: az * s };
 }
 
+export function headingRad(q: Q): number {
+    const xUp = 2 * (q.x * q.z - q.w * q.y);
+    const yUp = 2 * (q.y * q.z + q.w * q.x);
+    if (Math.abs(xUp) <= Math.abs(yUp)) {
+        return Math.atan2(2 * (q.x * q.y + q.w * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+    }
+    return Math.atan2(-2 * (q.x * q.y - q.w * q.z), 1 - 2 * (q.x * q.x + q.z * q.z));
+}
+
 export interface VisualOptions {
     smoothing?: number;
     deadbandDeg?: number;
@@ -77,9 +86,10 @@ export class VisualOrientation {
     }
 
     recenter(raw: Q): void {
-        this.offset = conjugate(normalize(raw));
+        const v = normalize(raw);
+        this.offset = fromAxisAngle(0, 0, 1, -headingRad(v));
         this.hasOffset = true;
-        this.smoothed = IDENTITY;
+        this.smoothed = this.applyDeadband(multiply(this.offset, v));
     }
 
     update(raw: Q): Q {
