@@ -83,8 +83,10 @@ export class SlimeVRBridge {
     sendBattery(deviceId: string, percent: number): void {
         const tracker = this.trackers.get(deviceId);
         if (!tracker) return;
+        // Triki reports no voltage, but the server ignores the level unless the voltage looks like a battery.
         const voltage = 3.3 + (percent / 100) * 0.9;
-        void tracker.changeBatteryLevel(voltage, percent / 100);
+        // Takes percent: the packet encoder divides by 100 itself.
+        void tracker.changeBatteryLevel(voltage, percent);
     }
 }
 

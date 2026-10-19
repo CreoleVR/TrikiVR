@@ -150,8 +150,29 @@ button.primary.scanning {
     gap: 0.15rem;
 }
 
+.device .name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
 .device .name {
     font-weight: 600;
+}
+
+.battery {
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.battery .batt-body {
+    width: 26px;
+    height: 13px;
+}
+
+.battery.stale {
+    opacity: 0.45;
 }
 
 .device .sub {

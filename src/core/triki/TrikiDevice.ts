@@ -3,6 +3,7 @@ import type { Characteristic, Peripheral } from "@stoprocent/noble";
 
 import {
     BATTERY_LEVEL_CHARACTERISTIC_UUID,
+    BATTERY_POLL_MS,
     NUS_RX_CHARACTERISTIC_UUID,
     NUS_TX_CHARACTERISTIC_UUID,
     START_COMMAND,
@@ -33,6 +34,9 @@ export class TrikiDevice extends EventEmitter {
     private readonly parser = new FrameParser();
     private readonly fusion = new OrientationFusion();
     private txCharacteristic?: Characteristic;
+    private batteryCharacteristic?: Characteristic;
+    private batteryTimer?: NodeJS.Timeout;
+    private batteryPercent?: number;
     private sampleCount = 0;
     private connected = false;
     private measuredDt = 0.01;
@@ -51,8 +55,14 @@ export class TrikiDevice extends EventEmitter {
         return this.connected;
     }
 
+    /** Last battery level in percent, once the Triki has reported one. */
+    get battery(): number | undefined {
+        return this.batteryPercent;
+    }
+
     async connect(): Promise<void> {
         this.peripheral.once("disconnect", () => {
+            this.stopBattery();
             this.connected = false;
             this.emit("disconnected");
         });
@@ -75,11 +85,12 @@ export class TrikiDevice extends EventEmitter {
             await rx.writeAsync(START_COMMAND, true);
         }
 
-        if (battery) void this.readBattery(battery);
+        if (battery) void this.watchBattery(battery);
         this.emit("connected");
     }
 
     async disconnect(): Promise<void> {
+        this.stopBattery();
         try {
             if (this.txCharacteristic) {
                 this.txCharacteristic.removeAllListeners("data");
@@ -134,12 +145,36 @@ export class TrikiDevice extends EventEmitter {
         }
     }
 
-    private async readBattery(battery: Characteristic): Promise<void> {
-        try {
-            const value = await battery.readAsync();
-            if (value.length > 0) this.emit("battery", value.readUInt8(0));
-        } catch {
-            return;
+    // Triki has the standard Battery Service: one byte of percent, readable and notified on change. Reads
+    // repeat every minute in case notifications don't come.
+    private async watchBattery(battery: Characteristic): Promise<void> {
+        this.batteryCharacteristic = battery;
+        battery.on("data", (data: Buffer) => this.handleBattery(data));
+        const read = () =>
+            battery
+                .readAsync()
+                .then((data) => this.handleBattery(data))
+                .catch(() => {});
+        this.batteryTimer = setInterval(() => void read(), BATTERY_POLL_MS);
+        this.batteryTimer.unref?.();
+        if (battery.properties?.includes("notify")) await battery.subscribeAsync().catch(() => {});
+        await read();
+    }
+
+    private handleBattery(data: Buffer): void {
+        if (!this.batteryCharacteristic || data.length < 1) return;
+        const percent = data.readUInt8(0);
+        if (percent > 100 || percent === this.batteryPercent) return;
+        this.batteryPercent = percent;
+        this.emit("battery", percent);
+    }
+
+    private stopBattery(): void {
+        if (this.batteryTimer) clearInterval(this.batteryTimer);
+        this.batteryTimer = undefined;
+        if (this.batteryCharacteristic) {
+            this.batteryCharacteristic.removeAllListeners("data");
+            this.batteryCharacteristic = undefined;
         }
     }
 }

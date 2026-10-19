@@ -103,6 +103,7 @@ with a platform-specific fix (the adapter check lives in
 3. Each Triki the scan finds connects by itself and appears as a separate
    tracker in SlimeVR. A Triki you **Disconnect** stays off until you press
    **Connect** again.
+   Each Triki's battery level shows next to its name, and in SlimeVR.
 4. Assign body parts and run SlimeVR's reset flow as usual.
 
 If pitch/roll/yaw come out swapped or inverted, adjust the `AxisMap` in

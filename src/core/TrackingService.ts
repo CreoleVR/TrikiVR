@@ -34,12 +34,13 @@ export declare interface TrackingService {
 }
 
 export class TrackingService extends EventEmitter {
-    private readonly manager = new TrikiManager();
+    private readonly manager: TrikiManager;
     private readonly bridge: SlimeVRBridge;
     private readonly gyroBiases: GyroBiasStore | null;
 
-    constructor(bridgeOptions: SlimeVRBridgeOptions = {}, gyroBiasFile?: string) {
+    constructor(bridgeOptions: SlimeVRBridgeOptions = {}, gyroBiasFile?: string, manager = new TrikiManager()) {
         super();
+        this.manager = manager;
         this.bridge = new SlimeVRBridge(bridgeOptions);
         this.gyroBiases = gyroBiasFile ? new GyroBiasStore(gyroBiasFile) : null;
 
@@ -54,12 +55,19 @@ export class TrackingService extends EventEmitter {
             const stored = this.gyroBiases?.get(device.address);
             if (stored) device.setGyroBias(stored, STORED_GYRO_BIAS_SIGMA);
             device.once("disconnected", () => this.saveGyroBias(device));
+            // The first reading arrives while the Triki connects, before anyone listens.
+            device.on("battery", (percent) => {
+                this.bridge.sendBattery(device.id, percent);
+                this.emit("battery", { id: device.id, percent });
+            });
+            if (device.battery !== undefined) this.emit("battery", { id: device.id, percent: device.battery });
             try {
                 await this.bridge.addTracker(device.id, device.address);
             } catch (err) {
                 this.emit("error", `SlimeVR tracker init failed for ${device.name}: ${(err as Error).message}`);
                 return;
             }
+            if (device.battery !== undefined) this.bridge.sendBattery(device.id, device.battery);
             let count = 0;
             let windowStart = Date.now();
             let hz = 0;
@@ -73,10 +81,6 @@ export class TrackingService extends EventEmitter {
                     windowStart = now;
                 }
                 this.emit("deviceData", { id: device.id, hz, quaternion, accel: sample.accel });
-            });
-            device.on("battery", (percent) => {
-                this.bridge.sendBattery(device.id, percent);
-                this.emit("battery", { id: device.id, percent });
             });
             this.emit("connected", { id: device.id, name: device.name });
         });

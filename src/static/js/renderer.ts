@@ -86,6 +86,7 @@ interface DeviceCard {
     cube: HTMLElement;
     badge: HTMLElement;
     button: HTMLButtonElement;
+    battery: HTMLElement;
 }
 
 const devices = new Map<string, DeviceState>();
@@ -94,6 +95,7 @@ const visuals = new Map<string, VisualOrientation>();
 let scanning = false;
 
 const TEXT_PAINT_INTERVAL_MS = 150;
+const LOW_BATTERY_PERCENT = 15;
 
 function log(message: string): void {
     const time = new Date().toLocaleTimeString();
@@ -128,7 +130,7 @@ function quatToMatrix3d(q: Quat): string {
 }
 
 function batteryIcon(percent: number): string {
-    const color = percent <= 15 ? "#ff6b6b" : percent <= 40 ? "#ffb020" : "var(--ok)";
+    const color = percent <= LOW_BATTERY_PERCENT ? "#ff6b6b" : percent <= 40 ? "#ffb020" : "var(--ok)";
     const fill = Math.max(0, Math.min(100, percent));
     return `<span class="batt" title="${fill}%"><span class="batt-body"><span class="batt-fill" style="width:${fill}%;background:${color}"></span></span><span class="batt-cap"></span></span><span class="batt-pct">${fill}%</span>`;
 }
@@ -149,14 +151,19 @@ function createCard(device: DeviceState): DeviceCard {
 
     const meta = document.createElement("div");
     meta.className = "meta";
+    const nameRow = document.createElement("div");
+    nameRow.className = "name-row";
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = device.name;
+    const battery = document.createElement("span");
+    battery.className = "battery";
+    nameRow.append(name, battery);
     const sub = document.createElement("span");
     sub.className = "sub";
     const data = document.createElement("div");
     data.className = "data";
-    meta.append(name, sub, data);
+    meta.append(nameRow, sub, data);
 
     const right = document.createElement("div");
     right.className = "right";
@@ -172,7 +179,7 @@ function createCard(device: DeviceState): DeviceCard {
     li.append(scene, meta, right);
     deviceList.appendChild(li);
 
-    return { li, sub, data, cube, badge, button };
+    return { li, sub, data, cube, badge, button, battery };
 }
 
 function renderList(): void {
@@ -211,8 +218,11 @@ function paintText(device: DeviceState, card: DeviceCard, force = false): void {
     if (!force && device.lastTextPaint && now - device.lastTextPaint < TEXT_PAINT_INTERVAL_MS) return;
     device.lastTextPaint = now;
 
-    const battery = device.battery !== undefined ? ` · ${batteryIcon(device.battery)}` : "";
-    card.sub.innerHTML = `${device.address} · ${device.rssi} dBm${battery}`;
+    card.sub.textContent = `${device.address} · ${device.rssi} dBm`;
+    const battery = device.battery !== undefined ? batteryIcon(device.battery) : "";
+    if (card.battery.innerHTML !== battery) card.battery.innerHTML = battery;
+    card.battery.classList.toggle("stale", !device.connected);
+    card.battery.title = device.connected ? "" : "Battery when last connected";
 
     const displayQuat = device.displayQuat ?? device.quaternion;
     if (device.connected && displayQuat) {
@@ -308,8 +318,13 @@ api.onDisconnected((id) => {
 api.onBattery(({ id, percent }) => {
     const device = devices.get(id);
     const card = cards.get(id);
-    if (device) device.battery = percent;
-    if (device && card) paintText(device, card, true);
+    if (!device) return;
+    const before = device.battery;
+    device.battery = percent;
+    if (percent <= LOW_BATTERY_PERCENT && (before === undefined || before > LOW_BATTERY_PERCENT)) {
+        log(`${device.name}: battery low (${percent}%)`);
+    }
+    if (card) paintText(device, card, true);
 });
 
 api.onDeviceData(({ id, hz, quaternion, accel }) => {

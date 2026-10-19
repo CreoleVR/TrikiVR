@@ -22,3 +22,6 @@ export const STORED_GYRO_BIAS_SIGMA = 0.3;
 export const MAX_SAVED_GYRO_BIAS_SIGMA = 0.2;
 
 export const AUTO_CONNECT_RETRY_MS = 3000;
+
+// The battery level is also re-read this often, in case a Triki doesn't notify changes.
+export const BATTERY_POLL_MS = 60_000;
