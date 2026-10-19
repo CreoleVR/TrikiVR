@@ -17,3 +17,6 @@ export const ACCEL_SCALE = 2048.0;
 export const START_COMMAND = Buffer.from("201000D007680003", "hex");
 
 export const STARTUP_DISCARD_SAMPLES = 20;
+
+export const STORED_GYRO_BIAS_SIGMA = 0.3;
+export const MAX_SAVED_GYRO_BIAS_SIGMA = 0.2;

@@ -7,7 +7,7 @@ import { TrackingService } from "./core/TrackingService.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
-const service = new TrackingService();
+const service = new TrackingService({}, path.join(app.getPath("userData"), "gyro-offsets.json"));
 
 function log(message: string): void {
     mainWindow?.webContents.send("log", message);

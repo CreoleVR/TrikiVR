@@ -23,7 +23,7 @@ Built on the official SlimeVR packages
 (`@slimevr/tracker-emulation`, `@slimevr/firmware-protocol`, `@slimevr/common`).
 The Triki BLE protocol is ported from
 [TrikiReader](https://github.com/AND-Y0/TrikiReader); orientation fusion is a
-TypeScript port of [VQF](https://github.com/dlaidig/vqf) (`BasicVQF`).
+TypeScript port of [VQF](https://github.com/dlaidig/vqf).
 
 ### The hardware
 
@@ -34,8 +34,11 @@ TypeScript port of [VQF](https://github.com/dlaidig/vqf) (`BasicVQF`).
 - The IMU stream is started by writing `201000D007680003` to the RX
   characteristic.
 
-Because there is no magnetometer, **yaw drifts** over time. This is normal for
-6-DoF trackers — use SlimeVR's *Reset* / *Mounting reset* to re-align.
+Because there is no magnetometer, **yaw can drift** slowly. TrikiVR learns each
+Triki's gyro offset (fastest while it lies still for a few seconds) and
+remembers it in `gyro-offsets.json` in the app's data folder
+(`%APPDATA%\trikivr` on Windows). Use SlimeVR's *Reset* / *Mounting reset* to
+re-align.
 
 ## Project layout
 
@@ -48,13 +51,14 @@ src/
     triki/
       constants.ts            NUS UUIDs, frame layout, scales, start command
       decode.ts               frame reassembly + decode (unit-tested)
-      vqf.ts                  BasicVQF port (MIT, dlaidig/vqf)
+      vqf.ts                  VQF port (MIT, dlaidig/vqf)
       fusion.ts               6-axis VQF orientation filter
+      GyroBiasStore.ts        per-Triki gyro offsets on disk
       TrikiDevice.ts          one BLE peripheral: connect, subscribe, fuse
       TrikiManager.ts         noble scan + multi-device lifecycle
     slimevr/
       SlimeVRBridge.ts        one EmulatedTracker per device
-      mapping.ts              IMU → SlimeVR quaternion axis remap
+      mapping.ts              IMU → SlimeVR axis remap
   static/                     renderer GUI (html/css/js)
 ```
 

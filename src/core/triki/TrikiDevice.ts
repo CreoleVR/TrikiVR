@@ -9,10 +9,10 @@ import {
     STARTUP_DISCARD_SAMPLES,
 } from "./constants.js";
 import { FrameParser, type ImuSample } from "./decode.js";
-import { OrientationFusion, type Quat } from "./fusion.js";
+import { OrientationFusion, type Quat, type Vec3 } from "./fusion.js";
 
 export interface TrikiDeviceEvents {
-    data: (data: { quaternion: Quat; sample: ImuSample }) => void;
+    data: (data: { quaternion: Quat; linearAcceleration: Vec3; sample: ImuSample }) => void;
     battery: (percent: number) => void;
     connected: () => void;
     disconnected: () => void;
@@ -95,6 +95,14 @@ export class TrikiDevice extends EventEmitter {
         this.fusion.reset();
     }
 
+    get gyroBias(): { bias: Vec3; sigma: number } | null {
+        return this.fusion.gyroBias;
+    }
+
+    setGyroBias(biasDegPerSec: Vec3, sigmaDegPerSec: number): void {
+        this.fusion.setGyroBias(biasDegPerSec, sigmaDegPerSec);
+    }
+
     private handleNotification(data: Buffer): void {
         const now = Date.now();
         const samples = this.parser.push(data);
@@ -122,7 +130,7 @@ export class TrikiDevice extends EventEmitter {
 
         for (const sample of ready) {
             const quaternion = this.fusion.update(sample, this.measuredDt);
-            this.emit("data", { quaternion, sample });
+            this.emit("data", { quaternion, linearAcceleration: this.fusion.linearAcceleration, sample });
         }
     }
 

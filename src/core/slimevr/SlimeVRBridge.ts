@@ -10,9 +10,14 @@ import {
 } from "@slimevr/firmware-protocol";
 import { EmulatedTracker } from "@slimevr/tracker-emulation";
 
-import type { ImuSample } from "../triki/decode.js";
-import type { Quat } from "../triki/fusion.js";
-import { type AxisMap, IDENTITY_AXIS_MAP, toSlimeVRQuaternion } from "./mapping.js";
+import type { Quat, Vec3 } from "../triki/fusion.js";
+import {
+    type AxisMap,
+    IDENTITY_AXIS_MAP,
+    toLegacyAccelFrame,
+    toSlimeVRQuaternion,
+    toSlimeVRVector,
+} from "./mapping.js";
 
 const FIRMWARE_NAME = "TrikiVR";
 
@@ -65,13 +70,14 @@ export class SlimeVRBridge {
         await Promise.allSettled([...this.trackers.keys()].map((id) => this.removeTracker(id)));
     }
 
-    sendData(deviceId: string, quaternion: Quat, sample: ImuSample): void {
+    sendData(deviceId: string, quaternion: Quat, linearAcceleration: Vec3): void {
         const tracker = this.trackers.get(deviceId);
         if (!tracker) return;
 
         const rotation = toSlimeVRQuaternion(quaternion, this.axisMap);
+        const accel = toLegacyAccelFrame(toSlimeVRVector(linearAcceleration, this.axisMap));
         void tracker.sendRotationData(0, RotationDataType.NORMAL, rotation, 0);
-        void tracker.sendAcceleration(0, new Vector(sample.accel.x, sample.accel.y, sample.accel.z));
+        void tracker.sendAcceleration(0, new Vector(accel.x, accel.y, accel.z));
     }
 
     sendBattery(deviceId: string, percent: number): void {

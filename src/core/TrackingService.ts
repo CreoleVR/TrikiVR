@@ -2,6 +2,9 @@ import { EventEmitter } from "events";
 
 import { SlimeVRBridge, type SlimeVRBridgeOptions } from "./slimevr/SlimeVRBridge.js";
 import type { AdapterIssue } from "./triki/adapter.js";
+import { MAX_SAVED_GYRO_BIAS_SIGMA, STORED_GYRO_BIAS_SIGMA } from "./triki/constants.js";
+import { GyroBiasStore } from "./triki/GyroBiasStore.js";
+import type { TrikiDevice } from "./triki/TrikiDevice.js";
 import { type DiscoveredDevice, TrikiManager } from "./triki/TrikiManager.js";
 
 export interface TrackingServiceEvents {
@@ -33,10 +36,12 @@ export declare interface TrackingService {
 export class TrackingService extends EventEmitter {
     private readonly manager = new TrikiManager();
     private readonly bridge: SlimeVRBridge;
+    private readonly gyroBiases: GyroBiasStore | null;
 
-    constructor(bridgeOptions: SlimeVRBridgeOptions = {}) {
+    constructor(bridgeOptions: SlimeVRBridgeOptions = {}, gyroBiasFile?: string) {
         super();
         this.bridge = new SlimeVRBridge(bridgeOptions);
+        this.gyroBiases = gyroBiasFile ? new GyroBiasStore(gyroBiasFile) : null;
 
         this.manager.on("discover", (d) => this.emit("discover", d));
         this.manager.on("scanStart", () => this.emit("scanStart"));
@@ -46,6 +51,9 @@ export class TrackingService extends EventEmitter {
         this.manager.on("error", (err) => this.emit("error", err.message));
 
         this.manager.on("deviceConnected", async (device) => {
+            const stored = this.gyroBiases?.get(device.address);
+            if (stored) device.setGyroBias(stored, STORED_GYRO_BIAS_SIGMA);
+            device.once("disconnected", () => this.saveGyroBias(device));
             try {
                 await this.bridge.addTracker(device.id, device.address);
             } catch (err) {
@@ -55,8 +63,8 @@ export class TrackingService extends EventEmitter {
             let count = 0;
             let windowStart = Date.now();
             let hz = 0;
-            device.on("data", ({ quaternion, sample }) => {
-                this.bridge.sendData(device.id, quaternion, sample);
+            device.on("data", ({ quaternion, linearAcceleration, sample }) => {
+                this.bridge.sendData(device.id, quaternion, linearAcceleration);
                 count++;
                 const now = Date.now();
                 if (now - windowStart >= 500) {
@@ -96,8 +104,19 @@ export class TrackingService extends EventEmitter {
     }
 
     async shutdown(): Promise<void> {
+        for (const device of this.manager.getConnectedDevices()) this.saveGyroBias(device);
         await this.manager.stopScanning().catch(() => {});
         await this.manager.disconnectAll();
         await this.bridge.removeAll();
+    }
+
+    private saveGyroBias(device: TrikiDevice): void {
+        const estimate = device.gyroBias;
+        if (!this.gyroBiases || !estimate || estimate.sigma > MAX_SAVED_GYRO_BIAS_SIGMA) return;
+        try {
+            this.gyroBiases.set(device.address, estimate.bias);
+        } catch (err) {
+            this.emit("error", `Saving the gyro offset of ${device.name} failed: ${(err as Error).message}`);
+        }
     }
 }
