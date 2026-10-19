@@ -100,8 +100,9 @@ with a platform-specific fix (the adapter check lives in
 1. Start the **SlimeVR Server**.
 2. Launch TrikiVR, press the button on each Triki to wake it, then click
    **Start scanning**.
-3. Click **Connect** on each discovered Triki — each appears as a separate
-   tracker in SlimeVR.
+3. Each Triki the scan finds connects by itself and appears as a separate
+   tracker in SlimeVR. A Triki you **Disconnect** stays off until you press
+   **Connect** again.
 4. Assign body parts and run SlimeVR's reset flow as usual.
 
 If pitch/roll/yaw come out swapped or inverted, adjust the `AxisMap` in

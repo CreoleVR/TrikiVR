@@ -20,3 +20,5 @@ export const STARTUP_DISCARD_SAMPLES = 20;
 
 export const STORED_GYRO_BIAS_SIGMA = 0.3;
 export const MAX_SAVED_GYRO_BIAS_SIGMA = 0.2;
+
+export const AUTO_CONNECT_RETRY_MS = 3000;

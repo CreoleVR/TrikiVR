@@ -3,7 +3,7 @@ import NobleModule from "@stoprocent/noble";
 import type { AdapterState, Noble, Peripheral } from "@stoprocent/noble";
 
 import { adapterIssueMessage, type AdapterIssue } from "./adapter.js";
-import { TRIKI_NAME_MATCH } from "./constants.js";
+import { AUTO_CONNECT_RETRY_MS, TRIKI_NAME_MATCH } from "./constants.js";
 import { TrikiDevice } from "./TrikiDevice.js";
 
 const noble = NobleModule as unknown as Noble;
@@ -32,9 +32,18 @@ export declare interface TrikiManager {
 }
 
 export class TrikiManager extends EventEmitter {
+    autoConnect = true;
+
     private readonly devices = new Map<string, TrikiDevice>();
     private readonly discovered = new Map<string, Peripheral>();
+    private readonly announced = new Set<string>();
+    private readonly held = new Set<string>();
+    private readonly lastAttempt = new Map<string, number>();
     private scanning = false;
+
+    constructor(private readonly ble: Noble = noble) {
+        super();
+    }
 
     getConnectedDevices(): TrikiDevice[] {
         return [...this.devices.values()];
@@ -53,15 +62,16 @@ export class TrikiManager extends EventEmitter {
             return;
         }
 
-        noble.on("discover", this.onDiscover);
+        this.announced.clear();
+        this.ble.on("discover", this.onDiscover);
         try {
-            await noble.startScanningAsync([], false);
+            await this.ble.startScanningAsync([], true);
         } catch {
-            noble.removeListener("discover", this.onDiscover);
+            this.ble.removeListener("discover", this.onDiscover);
             this.emit("adapterIssue", {
-                state: noble.state,
+                state: this.ble.state,
                 platform: process.platform,
-                message: adapterIssueMessage(noble.state, process.platform),
+                message: adapterIssueMessage(this.ble.state, process.platform),
             });
             return;
         }
@@ -70,60 +80,71 @@ export class TrikiManager extends EventEmitter {
     }
 
     getAdapterState(): AdapterState {
-        return noble.state;
+        return this.ble.state;
     }
 
     private waitForPoweredOn(timeoutMs = 6000): Promise<AdapterState> {
-        if (noble.state === "poweredOn") return Promise.resolve("poweredOn");
+        if (this.ble.state === "poweredOn") return Promise.resolve("poweredOn");
 
         return new Promise((resolve) => {
             let settled = false;
             const finish = (state: AdapterState): void => {
                 if (settled) return;
                 settled = true;
-                noble.removeListener("stateChange", onState);
+                this.ble.removeListener("stateChange", onState);
                 clearTimeout(timer);
                 resolve(state);
             };
             const onState = (state: AdapterState): void => {
                 if (state !== "unknown" && state !== "resetting") finish(state);
             };
-            noble.on("stateChange", onState);
-            const timer = setTimeout(() => finish(noble.state), timeoutMs);
+            this.ble.on("stateChange", onState);
+            const timer = setTimeout(() => finish(this.ble.state), timeoutMs);
         });
     }
 
     async stopScanning(): Promise<void> {
         if (!this.scanning) return;
-        noble.removeListener("discover", this.onDiscover);
-        await noble.stopScanningAsync();
+        this.ble.removeListener("discover", this.onDiscover);
+        await this.ble.stopScanningAsync();
         this.scanning = false;
         this.emit("scanStop");
     }
 
     async connect(id: string): Promise<void> {
+        this.held.delete(id);
+        await this.open(id);
+    }
+
+    private async open(id: string): Promise<void> {
         if (this.devices.has(id)) return;
         const peripheral = this.discovered.get(id);
         if (!peripheral) throw new Error(`Unknown device id: ${id}`);
 
         const device = new TrikiDevice(peripheral);
+        let up = false;
         device.once("disconnected", () => {
-            this.devices.delete(id);
-            this.emit("deviceDisconnected", id);
+            if (this.devices.get(id) === device) this.devices.delete(id);
+            this.announced.delete(id);
+            if (up) this.emit("deviceDisconnected", id);
         });
         device.on("error", (err) => this.emit("error", err));
 
         this.devices.set(id, device);
+        this.lastAttempt.set(id, Date.now());
         try {
             await device.connect();
-            this.emit("deviceConnected", device);
         } catch (err) {
-            this.devices.delete(id);
+            if (this.devices.get(id) === device) this.devices.delete(id);
+            if (device.isConnected) void device.disconnect().catch(() => {});
             throw err;
         }
+        up = true;
+        this.emit("deviceConnected", device);
     }
 
     async disconnect(id: string): Promise<void> {
+        this.held.add(id);
         const device = this.devices.get(id);
         if (!device) return;
         await device.disconnect();
@@ -139,12 +160,15 @@ export class TrikiManager extends EventEmitter {
         const name = peripheral.advertisement?.localName ?? "";
         if (!name.toLowerCase().includes(TRIKI_NAME_MATCH.toLowerCase())) return;
 
-        this.discovered.set(peripheral.id, peripheral);
-        this.emit("discover", {
-            id: peripheral.id,
-            name,
-            address: peripheral.address || peripheral.id,
-            rssi: peripheral.rssi,
-        });
+        const id = peripheral.id;
+        this.discovered.set(id, peripheral);
+        if (!this.announced.has(id)) {
+            this.announced.add(id);
+            this.emit("discover", { id, name, address: peripheral.address || id, rssi: peripheral.rssi });
+        }
+
+        if (!this.autoConnect || this.devices.has(id) || this.held.has(id)) return;
+        if (Date.now() - (this.lastAttempt.get(id) ?? 0) < AUTO_CONNECT_RETRY_MS) return;
+        this.open(id).catch((err: Error) => this.emit("log", `Connecting ${name} failed (${err.message}), retrying`));
     };
 }
